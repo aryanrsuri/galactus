@@ -123,7 +123,7 @@ func run(db *sql.DB) error {
 		}
 		spans := history(db)
 		for _, span := range(spans) {
-			status(&span, Options{task: span.task_comment, view: view})
+			status(&span, Options{message: "-", view: view})
 		}
 		return nil
 	case "gantt":
@@ -251,8 +251,8 @@ func status(span *Span, options Options) {
 		comment = fmt.Sprintf(" S %s %s O %d C %d T %s %s",
 		span.span_id[:12], span.comment, span.open, span.close, span.task_id[:12], span.task_comment)
 	} else {
-		comment = fmt.Sprintf(" %s\n\n opened: %s\n closed: %s\n span: %s\n comment: %s\n\n task: %s\n",
-			options.message, open, close, span.span_id, span.comment, span.task_id)
+		comment = fmt.Sprintf(" %s\n\n span: %s\n opened: %s\n closed: %s\n comment: %s\n\n task: %s\n",
+			options.message, span.span_id, open, close, span.comment, span.task_id)
 		// FIXME: Remove the need for the options type
 		// the fix is to pass in a new struct, when
 		// options *was* needed for task / labels
@@ -277,4 +277,3 @@ func status(span *Span, options Options) {
 func gantt(db *sql.DB) error {
 	return nil
 }
-
