@@ -22,8 +22,8 @@ type Option struct {
 type Span struct {
 	span_id string
 	task_id string
-	begin   int64
-	end     int64
+	open int64
+	close int64
 	comment string
 }
 
@@ -44,41 +44,40 @@ func run(db *sql.DB) error {
 		help := `
  galactus is a time span tracker
 
- open a span: 'begin -task "<task comment>" <space separated labels'
- end a span: 'end "<span comment>"
+ open a span: 'open -task "<task comment>" <space separated labels>'
+ close a span: 'close "<span comment>"
  show status of any current span: 'status'
 		`
 
 		status(nil, Option{message: help})
 	}
 	switch input[0] {
-	case "begin":
+	case "open":
 		if len(input) < 2 {
-			return fmt.Errorf("begining a span requires `begin -task <arguement>` and optional space separated labels\n")
+			return fmt.Errorf("opening span requires `open -task <arguement>` and optional space separated labels\n")
 		}
 		if input[1] != "-task" {
-			return fmt.Errorf("begin requires a `-task` argument\n")
+			return fmt.Errorf("open requires a `-task` argument\n")
 		}
 		var option Option
 		option.task = input[2]
 		option.labels = input[3:]
-		span, err := begin(db, option)
+		span, err := open(db, option)
 		if err != nil {
 			return err
 		}
 		status(span, Option{message: "New span opened", task: option.task, labels: option.labels})
 		return nil
-	case "end":
+	case "close":
 		if len(input) < 2 {
-			return fmt.Errorf("ending a span requires a comment `end '<comment>'`\n")
+			return fmt.Errorf("closing a span requires a comment `close '<comment>'`\n")
 		}
-		span, err := end(db, input[1])
+		span, err := close(db, input[1])
 		if err != nil {
 			return err
 		}
 		status(span, Option{message: "Span closed"})
 		return nil
-
 	case "status":
 		span := get_span(db)
 		var message string
@@ -99,7 +98,7 @@ func run(db *sql.DB) error {
 
 func get_span(db *sql.DB) *Span {
 	var span Span
-	if err := db.QueryRow("SELECT span_id, task_id, begin FROM spans WHERE end IS NULL LIMIT 1;").Scan(&span.span_id, &span.task_id, &span.begin); err != nil {
+	if err := db.QueryRow("SELECT span_id, task_id, open FROM spans WHERE close IS NULL LIMIT 1;").Scan(&span.span_id, &span.task_id, &span.open); err != nil {
 		if err == sql.ErrNoRows {
 			return nil
 		}
@@ -108,7 +107,7 @@ func get_span(db *sql.DB) *Span {
 	return &span
 }
 
-func begin(db *sql.DB, options Option) (*Span, error) {
+func open(db *sql.DB, options Option) (*Span, error) {
 	if span := get_span(db); span != nil {
 		options.message = "A span has already been opened"
 		status(span, options)
@@ -129,10 +128,10 @@ func begin(db *sql.DB, options Option) (*Span, error) {
 		return nil, err
 	}
 
-	begin := time.Now().Unix()
-	span_id := get_hash(strconv.FormatInt(begin, 10) + options.task)
+	open := time.Now().Unix()
+	span_id := get_hash(strconv.FormatInt(open, 10) + options.task)
 
-	if _, err := tx.Exec("INSERT INTO spans (span_id, task_id, begin) VALUES (?, ?, ?);", span_id, get_hash(options.task), begin); err != nil {
+	if _, err := tx.Exec("INSERT INTO spans (span_id, task_id, open) VALUES (?, ?, ?);", span_id, get_hash(options.task), open); err != nil {
 		return nil, err
 	}
 
@@ -151,7 +150,7 @@ func begin(db *sql.DB, options Option) (*Span, error) {
 	return span, nil
 }
 
-func end(db *sql.DB, comment string) (*Span, error) {
+func close(db *sql.DB, comment string) (*Span, error) {
 	span := get_span(db)
 	if span == nil {
 		status(span, Option{message: "No span open"})
@@ -162,8 +161,8 @@ func end(db *sql.DB, comment string) (*Span, error) {
 	}
 	defer tx.Rollback()
 
-	end := time.Now().Unix()
-	if _, err := tx.Exec("UPDATE spans SET end = ?, comment = ? WHERE span_id = ?;", end, comment, span.span_id); err != nil {
+	close := time.Now().Unix()
+	if _, err := tx.Exec("UPDATE spans SET close = ?, comment = ? WHERE span_id = ?;", close, comment, span.span_id); err != nil {
 		return nil, err
 	}
 
@@ -171,7 +170,7 @@ func end(db *sql.DB, comment string) (*Span, error) {
 		return nil, err
 	}
 
-	span.end = end
+	span.close = close 
 	span.comment = comment
 	return span, nil
 }
@@ -181,17 +180,17 @@ func end(db *sql.DB, comment string) (*Span, error) {
 // b) Nil span (or, better)
 func status(span *Span, option Option) {
 	if span == nil {
-		fmt.Println(option.message)
+		fmt.Printf("\n %s\n\n", option.message)
 		os.Exit(0)
 	}
-	var start string = time.Unix(span.begin, 0).UTC().String()
-	var end string
-	if span.end == 0 {
-		end = ""
+	var start string = time.Unix(span.open, 0).UTC().String()
+	var close string
+	if span.close == 0 {
+		close = ""
 	} else {
-		end = time.Unix(span.end, 0).UTC().String()
+		close = time.Unix(span.close, 0).UTC().String()
 	}
-	comment := fmt.Sprintf("\n %s\n\n opened: %s\n closed: %s\n span: %s\n comment: %s\n\n task: %s\n", option.message, start, end, span.span_id, span.comment, span.task_id)
+	comment := fmt.Sprintf("\n %s\n\n opened: %s\n closed: %s\n span: %s\n comment: %s\n\n task: %s\n", option.message, start, close, span.span_id, span.comment, span.task_id)
 	if option.task != "" {
 		comment = comment + fmt.Sprintf(" task comment: %s\n", option.task)
 	}
@@ -211,6 +210,3 @@ func gantt(db *sql.DB) error {
 	return nil
 }
 
-// I want to refactor the term begin to open
-// and end to close, as the `span` concept
-// aligns better with those than being-end

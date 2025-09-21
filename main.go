@@ -26,8 +26,8 @@ CREATE TABLE IF NOT EXISTS tasks(
 CREATE TABLE IF NOT EXISTS spans(
 	span_id 	TEXT PRIMARY KEY,
   task_id   TEXT NOT NULL REFERENCES tasks(task_id),
-  begin     INTEGER NOT NULL,
-  end       INTEGER NULL,
+  open			INTEGER NOT NULL,
+  close			INTEGER NULL,
   comment   TEXT NULL
 );
 
@@ -38,9 +38,9 @@ CREATE TABLE IF NOT EXISTS span_labels (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_span_labels ON span_labels(span_id,label_id);
-CREATE INDEX IF NOT EXISTS idx_spans_end_null ON spans(end) WHERE end IS NULL;
-CREATE INDEX IF NOT EXISTS idx_spans_task_begin ON spans(task_id, begin);
-CREATE INDEX IF NOT EXISTS idx_spans_begin_desc ON spans(begin DESC);
+CREATE INDEX IF NOT EXISTS idx_spans_close_null ON spans(close) WHERE close IS NULL;
+CREATE INDEX IF NOT EXISTS idx_spans_task_open ON spans(task_id, open);
+CREATE INDEX IF NOT EXISTS idx_spans_open_desc ON spans(open DESC);
 `
 
 func create_root(root string) error {
