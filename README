@@ -88,6 +88,7 @@ Tasks
 
 #. Remove the options type
 #. Implement gantt.
+#. Use UnixMili
 #. Update requirements to reflect in-situ decisons changes.
 
 Made with <3 by @asuri. 

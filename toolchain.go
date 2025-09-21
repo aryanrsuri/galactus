@@ -8,10 +8,17 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
+
+
+type Filter struct {
+	open int64
+	close int64
+}
 
 type Options struct {
 	message string
@@ -125,7 +132,7 @@ func run(db *sql.DB) error {
 		if len(input) == 2 {
 			view = input[1]
 		}
-		spans := history(db)
+		spans := history(db, Filter{})
 		for _, span := range(spans) {
 			status(&span, Options{message: "-", view: view})
 		}
@@ -215,13 +222,21 @@ func close(db *sql.DB, comment string) (*Span, error) {
 	return span, nil
 }
 
-func history(db *sql.DB) []Span {
+func history(db *sql.DB, filter Filter) []Span {
 	var spans []Span
-	rows, err := db.Query(`
-		SELECT spans.span_id, spans.task_id, spans.open, spans.close, spans.comment, tasks.comment as 'task_comment'
+	query := `
+		SELECT spans.span_id, spans.task_id, spans.open,
+		spans.close, spans.comment, tasks.comment as 'task_comment'
 		FROM spans
-		JOIN tasks ON spans.task_id = tasks.task_id;`)
+		JOIN tasks ON spans.task_id = tasks.task_id`
 
+	
+	if filter.open != 0 {
+		// FIXME: Is there a way to maintain terness and avoid injection issues?
+		query = query + fmt.Sprintf(" WHERE spans.open > %d;", filter.open)
+	} 	
+
+	rows, err := db.Query(query)
 	if err != nil {
 		return nil
 	}
@@ -234,9 +249,7 @@ func history(db *sql.DB) []Span {
 	return spans
 }
 
-// Will need to extend this for
-// a) List of spans (history)
-// b) Nil span (or, better)
+// FIXME: Use a string builder
 func status(span *Span, options Options) {
 	if span == nil {
 		fmt.Printf(" %s\n\n", options.message)
@@ -279,5 +292,35 @@ func status(span *Span, options Options) {
 }
 
 func gantt(db *sql.DB) error {
+	now := time.Now()
+	loc := time.Local 
+	zero := time.Date(now.Year(), now.Month(), now.Day(), 0,0,0,0, loc)
+	_ = history(db, Filter{ open: now.AddDate(0,0,-7).Unix()})
+	days := make([]time.Time, 7)
+	for i := 0; i < 7; i++ {
+		days[6-i] = zero.AddDate(0,0,-i)
+	}
+	var builder strings.Builder
+	builder.WriteByte('\t')
+	for h := 0; h < 24; h++ {
+		builder.WriteString(fmt.Sprintf(" %2d", h))
+	}
+	builder.WriteByte('\n')
+
+	for _, day := range days {
+		var sum int64 
+		builder.WriteString(fmt.Sprintf("%-6s", day.Format("Mon 01-02")))
+		builder.WriteByte('\n')
+		for h := 0; h < 24; h++ {
+			// Get done
+		}
+	}
+
+	// basis is last seven days
+	// 0 ... 23
+	// Fri
+	// Sat
+	// etc...
+	fmt.Println(builder.String())
 	return nil
 }
