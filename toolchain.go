@@ -273,9 +273,9 @@ func status(span *Span, options Options) {
 		// FIXME: Remove the need for the options type
 		// the fix is to pass in a new struct, when
 		// options *was* needed for task / labels
-		if options.task != "" {
-			comment = comment + fmt.Sprintf(" task comment: %s\n", options.task)
-		}
+		//if options.task != "" {
+		//	comment = comment + fmt.Sprintf(" task comment: %s\n", options.task)
+		//}
 		if span.task_comment != "" {
 			comment = comment + fmt.Sprintf(" task comment: %s\n", span.task_comment)
 		}
@@ -308,7 +308,7 @@ func gantt(db *sql.DB) error {
 	builder.WriteByte('\n')
 
 	for _, day := range days {
-		var sum int64 
+		var _ int64 
 		builder.WriteString(fmt.Sprintf("%-6s", day.Format("Mon 01-02")))
 		builder.WriteByte('\n')
 		for h := 0; h < 24; h++ {
