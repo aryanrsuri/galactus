@@ -86,9 +86,9 @@ Types
 
 Tasks
 
-1. Remove the options type
-1. Implement gantt.
-2. Update requirements to reflect in-situ descision changes.
+#. Remove the options type
+#. Implement gantt.
+#. Update requirements to reflect in-situ decisons changes.
 
 Made with <3 by @asuri. 
 LLM-free.
