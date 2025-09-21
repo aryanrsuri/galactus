@@ -60,17 +60,21 @@ func run(db *sql.DB) error {
 		help := `
  galactus is a time span tracker
 
- open new span: 'open -task "<task comment>" <space separated labels>'
- close current span: 'close "<span comment>"
- show status: 'status'
- show history: 'history'
-		`
+ open new span
+ '[open | op] -task "<task comment>" <space separated labels>'
+ close current span
+ '[close | cl] "<span comment>"'
+ show status
+ 'status condensed?'
+ show history
+ 'history condensed?'
+	`
 
 		status(nil, Options{message: help})
 		return nil
 	}
 	switch input[0] {
-	case "open":
+	case "open", "op":
 		if len(input) < 2 {
 			return fmt.Errorf("opening span requires `open -task <arguement>` and optional space separated labels\n")
 		}
@@ -89,7 +93,7 @@ func run(db *sql.DB) error {
 		}
 		status(span, Options{message: "New span opened", task: options.task, labels: options.labels})
 		return nil
-	case "close":
+	case "close", "cl":
 		if len(input) < 2 {
 			return fmt.Errorf("closing a span requires a comment `close '<comment>'`\n")
 		}
@@ -102,7 +106,7 @@ func run(db *sql.DB) error {
 		}
 		status(span, Options{message: "Span closed"})
 		return nil
-	case "status":
+	case "status", "st":
 		span := get_span(db)
 		var message string
 		if span == nil {
@@ -116,7 +120,7 @@ func run(db *sql.DB) error {
 		}
 		status(span, Options{message: message, view: view})
 		return nil
-	case "history":
+	case "history", "ht":
 		var view string
 		if len(input) == 2 {
 			view = input[1]
