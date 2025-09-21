@@ -1,0 +1,86 @@
+Galactus
+
+Galactus is a labeled time span tracker.
+
+Problem statement
+
+> To track focused time span where precise task(s) gets done,
+> and to align those spans with broader personal goals.
+
+Requirements
+
+  1. Log a given time chunk (`span`).
+    1.1 Begin (`begin`) a timer with one task (`task`) when you
+        start work on a project, you can enter any number of space 
+        separated labels (`label`).
+      1.1.1 Check to see if the timer is working (2.1.1a).
+      1.1.1 For each *new* label, generate a labels entry.
+        1.1.1a Label id: Hash of the label text
+        1.1.1b Comment: the label text given in the command.
+      1.1.2 Generate a task entry
+        1.1.2a Task id: Hash of the task text
+        1.1.2b If a task entry already exists, ignore.
+        1.1.2c Note well, a task is currently not associated with
+        a label in any way, this could change.
+      1.1.3 Generate an open span
+        1.1.3a Span id: unique identifier to that time span.
+        1.1.3c Span start: unix start.
+        1.1.3d Task id.
+      1.1.4 Generate span + label entries.
+        1.1.4a For each label, generate a span_labels entry.
+      1.1.5 Start the timer
+        1.1.5a This will generate a micro-offset to the nominal
+        span start. This is okay.
+    1.2 End (`end`) a timer, and enter a short comment (`comment`) 
+        about your session.
+      1.2.1 Only one timer can exist at a time
+    1.3 Complete a span:
+      1.3.1 Find the open (most recent) span id, and enter
+        1.3.1a Span end: unix end
+        1.3.1b Comment: comment string
+  2. Show the status of the timer.
+    2.1 The status (`status`) is either
+      2.1.1 Idle (`idle`) if there is no open span.
+        2.1.1a Returned iff. no `span_end` entry is NULL.
+      2.1.2 Working (`working`) if there is an open span.
+        2.1.2a Returned iff. there is one NULL `span_end`.
+        2.1.2b Returns the metadata of the open span.
+        2.1.2c Returns the length of the open span as is.
+  3. Log the span history.
+    3.1 The log (`log`) renders a list of all previous spans
+    along with their metadata.
+  4. Visualise span history with a gantt chart.
+    4.1 The gantt (`gantt`) chart is a horizontal bar chart that shows
+    the duration of labeled time spans against the progression of time.
+      4.1.1 The gantt chart is rendered in tty using a terminal ui
+      library. 
+
+Types
+
+```
+
+  labels {
+    label_id  string
+    comment   string
+  }
+
+  tasks {
+    task_id   string
+    comment   string
+  }
+
+  span_labels {
+    label_id  string
+    span_id   string 
+  }
+
+  spans {
+    span_id   string 
+    task_id   string
+    begin     int64
+    end       int64
+    comment   string
+  }
+
+```
+
