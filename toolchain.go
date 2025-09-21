@@ -13,10 +13,11 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type Option struct {
+type Options struct {
 	message string
 	task    string
 	labels  []string
+	view string
 }
 
 type Span struct {
@@ -25,16 +26,31 @@ type Span struct {
 	open int64
 	close int64
 	comment string
+
+	task_comment string
+	labels []string
 }
+
+
 
 func get_hash(comment string) string {
 	sum := sha256.Sum256([]byte(comment))
 	return fmt.Sprintf("%x", sum)
 }
 
-func get_hash_from_prefix(prefix string) string {
-	_ = prefix
-	return "Not done yet"
+func get_span(db *sql.DB) *Span {
+	var span Span
+	if err := db.QueryRow(`
+		SELECT spans.span_id, spans.task_id, spans.open, tasks.comment as 'task_comment'
+		FROM spans
+		JOIN tasks ON spans.task_id = tasks.task_id WHERE spans.close IS NULL LIMIT 1;`).
+		Scan(&span.span_id, &span.task_id, &span.open, &span.task_comment); err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		log.Panicf("could not query span table, check error: %v\n", err)
+	}
+	return &span
 }
 
 func run(db *sql.DB) error {
@@ -44,12 +60,14 @@ func run(db *sql.DB) error {
 		help := `
  galactus is a time span tracker
 
- open a span: 'open -task "<task comment>" <space separated labels>'
- close a span: 'close "<span comment>"
- show status of any current span: 'status'
+ open new span: 'open -task "<task comment>" <space separated labels>'
+ close current span: 'close "<span comment>"
+ show status: 'status'
+ show history: 'history'
 		`
 
-		status(nil, Option{message: help})
+		status(nil, Options{message: help})
+		return nil
 	}
 	switch input[0] {
 	case "open":
@@ -59,14 +77,17 @@ func run(db *sql.DB) error {
 		if input[1] != "-task" {
 			return fmt.Errorf("open requires a `-task` argument\n")
 		}
-		var option Option
-		option.task = input[2]
-		option.labels = input[3:]
-		span, err := open(db, option)
+		var options Options
+		options.task = input[2]
+		options.labels = input[3:]
+		span, err := open(db, options)
 		if err != nil {
 			return err
 		}
-		status(span, Option{message: "New span opened", task: option.task, labels: option.labels})
+		if span == nil {
+			return nil
+		}
+		status(span, Options{message: "New span opened", task: options.task, labels: options.labels})
 		return nil
 	case "close":
 		if len(input) < 2 {
@@ -76,7 +97,10 @@ func run(db *sql.DB) error {
 		if err != nil {
 			return err
 		}
-		status(span, Option{message: "Span closed"})
+		if span == nil {
+			return nil
+		}
+		status(span, Options{message: "Span closed"})
 		return nil
 	case "status":
 		span := get_span(db)
@@ -86,31 +110,41 @@ func run(db *sql.DB) error {
 		} else {
 			message = "Current span status"
 		}
-		status(span, Option{message: message})
+		var view string
+		if len(input) == 2 {
+			view = input[1]
+		}
+		status(span, Options{message: message, view: view})
+		return nil
+	case "history":
+		var view string
+		if len(input) == 2 {
+			view = input[1]
+		}
+		spans := history(db)
+		for _, span := range(spans) {
+			status(&span, Options{task: span.task_comment, view: view})
+		}
 		return nil
 	case "gantt":
 		return gantt(db)
 	default:
-		status(nil, Option{message: fmt.Sprintf("unkown command %s\n", input[0])})
+		status(nil, Options{message: fmt.Sprintf("unkown command %s\n", input[0])})
 		return nil
 	}
 }
 
-func get_span(db *sql.DB) *Span {
-	var span Span
-	if err := db.QueryRow("SELECT span_id, task_id, open FROM spans WHERE close IS NULL LIMIT 1;").Scan(&span.span_id, &span.task_id, &span.open); err != nil {
-		if err == sql.ErrNoRows {
-			return nil
-		}
-		log.Panicf("could not query span table, check error: %v\n", err)
-	}
-	return &span
-}
-
-func open(db *sql.DB, options Option) (*Span, error) {
+func open(db *sql.DB, options Options) (*Span, error) {
 	if span := get_span(db); span != nil {
-		options.message = "A span has already been opened"
-		status(span, options)
+		var option = Options{
+			message: "A span has already been opened",
+			task: span.task_comment,
+			labels: span.labels,
+			view: options.view,
+		}
+		
+		status(span, option)
+		return nil, nil
 	}
 
 	tx, err := db.Begin()
@@ -124,6 +158,7 @@ func open(db *sql.DB, options Option) (*Span, error) {
 			return nil, err
 		}
 	}
+
 	if _, err := tx.Exec("INSERT OR IGNORE INTO tasks (task_id, comment) VALUES (?, ?);", get_hash(options.task), options.task); err != nil {
 		return nil, err
 	}
@@ -153,7 +188,8 @@ func open(db *sql.DB, options Option) (*Span, error) {
 func close(db *sql.DB, comment string) (*Span, error) {
 	span := get_span(db)
 	if span == nil {
-		status(span, Option{message: "No span open"})
+		status(span, Options{message: "No span open"})
+		return nil, nil
 	}
 	tx, err := db.Begin()
 	if err != nil {
@@ -175,35 +211,67 @@ func close(db *sql.DB, comment string) (*Span, error) {
 	return span, nil
 }
 
+func history(db *sql.DB) []Span {
+	var spans []Span
+	rows, err := db.Query(`
+		SELECT spans.span_id, spans.task_id, spans.open, spans.close, spans.comment, tasks.comment as 'task_comment'
+		FROM spans
+		JOIN tasks ON spans.task_id = tasks.task_id;`)
+
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var span Span
+		rows.Scan(&span.span_id, &span.task_id, &span.open, &span.close, &span.comment, &span.task_comment)
+		spans = append(spans, span)
+	}
+	return spans
+}
+
 // Will need to extend this for
 // a) List of spans (history)
 // b) Nil span (or, better)
-func status(span *Span, option Option) {
+func status(span *Span, options Options) {
 	if span == nil {
-		fmt.Printf("\n %s\n\n", option.message)
-		os.Exit(0)
+		fmt.Printf(" %s\n\n", options.message)
+		return
 	}
-	var start string = time.Unix(span.open, 0).UTC().String()
+	var open string = time.Unix(span.open, 0).UTC().String()
 	var close string
 	if span.close == 0 {
 		close = ""
 	} else {
 		close = time.Unix(span.close, 0).UTC().String()
 	}
-	comment := fmt.Sprintf("\n %s\n\n opened: %s\n closed: %s\n span: %s\n comment: %s\n\n task: %s\n", option.message, start, close, span.span_id, span.comment, span.task_id)
-	if option.task != "" {
-		comment = comment + fmt.Sprintf(" task comment: %s\n", option.task)
-	}
 
-	if len(option.labels) > 0 {
-		comment = comment + " labels:"
-		for _, label := range option.labels {
-			comment = comment + fmt.Sprintf(" %s,", label)
+	var comment string
+	if options.view == "condensed" {
+		comment = fmt.Sprintf(" S %s %s O %d C %d T %s %s",
+		span.span_id[:12], span.comment, span.open, span.close, span.task_id[:12], span.task_comment)
+	} else {
+		comment = fmt.Sprintf(" %s\n\n opened: %s\n closed: %s\n span: %s\n comment: %s\n\n task: %s\n",
+			options.message, open, close, span.span_id, span.comment, span.task_id)
+		// FIXME: Remove the need for the options type
+		// the fix is to pass in a new struct, when
+		// options *was* needed for task / labels
+		if options.task != "" {
+			comment = comment + fmt.Sprintf(" task comment: %s\n", options.task)
 		}
-		comment = comment[:len(comment)-1]
+		if span.task_comment != "" {
+			comment = comment + fmt.Sprintf(" task comment: %s\n", span.task_comment)
+		}
+
+		if len(options.labels) > 0 {
+			comment = comment + " labels:"
+			for _, label := range options.labels {
+				comment = comment + fmt.Sprintf(" %s,", label)
+			}
+			comment = comment[:len(comment)-1]
+		}
 	}
 	fmt.Println(comment)
-	os.Exit(0)
 }
 
 func gantt(db *sql.DB) error {

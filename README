@@ -86,6 +86,7 @@ Types
 
 Tasks
 
+1. Remove the options type
 1. Implement gantt.
 2. Update requirements to reflect in-situ descision changes.
 
