@@ -1,14 +1,15 @@
 Galactus
 
-Galactus is a labeled time span tracker.
+Galactus is a time span tracker.
 
 Problem statement
 
-> To track focused time span where precise task(s) gets done,
-> and to align those spans with broader personal goals.
+  To track focused time span where precise task(s) gets done,
+  and to align those spans with broader personal goals.
 
-Requirements
+Requirements 
 
+rc1
   1. Log a given time chunk (`span`).
     1.1 Begin (`begin`) a timer with one task (`task`) when you
         start work on a project, you can enter any number of space 
@@ -49,47 +50,24 @@ Requirements
   3. Log the span history.
     3.1 The log (`log`) renders a list of all previous spans
     along with their metadata.
+
+rc2
   4. Visualise span history with a gantt chart.
     4.1 The gantt (`gantt`) chart is a horizontal bar chart that shows
     the duration of labeled time spans against the progression of time.
       4.1.1 The gantt chart is rendered in tty using a terminal ui
       library. 
+  5. When opening a span, allow an optional `time` parameter.
+    5.1 A span will automatically "ring" and close after the alloted time is complete.
+  6. Given a span id, you can `revise` the span.
+    6.1 You can edit the close time, comment, and labels.
 
-Types
+Items
 
-```
+1. Should make the span id a guid, not a checksum. This would allow
+users to edit the task comment and open time values.
 
-  labels {
-    label_id  string
-    comment   string
-  }
-
-  tasks {
-    task_id   string
-    comment   string
-  }
-
-  span_labels {
-    label_id  string
-    span_id   string 
-  }
-
-  spans {
-    span_id   string 
-    task_id   string
-    begin     int64
-    end       int64
-    comment   string
-  }
-
-```
-
-Tasks
-
-#. Remove the options type
-#. Implement gantt.
-#. Use UnixMili
-#. Update requirements to reflect in-situ decisons changes.
+-----------
 
 Made with <3 by @asuri. 
 LLM-free.

@@ -83,14 +83,11 @@ func run(db *sql.DB) error {
 	switch input[0] {
 	case "open", "op":
 		if len(input) < 2 {
-			return fmt.Errorf("opening span requires `open -task <arguement>` and optional space separated labels\n")
-		}
-		if input[1] != "-task" {
-			return fmt.Errorf("open requires a `-task` argument\n")
+			return fmt.Errorf("opening span requires `open '<arguement>'` and optional space separated labels\n")
 		}
 		var options Options
-		options.task = input[2]
-		options.labels = input[3:]
+		options.task = input[1]
+		options.labels = input[2:]
 		span, err := open(db, options)
 		if err != nil {
 			return err
