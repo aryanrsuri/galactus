@@ -68,13 +68,13 @@ func run(db *sql.DB) error {
  galactus is a time span tracker
 
  open new span
- '[open | op] -task "<task comment>" <space separated labels>'
+ 'open "<task comment>" <space separated labels>'
  close current span
- '[close | cl] "<span comment>"'
- show status
- 'status condensed?'
- show history
- 'history condensed?'
+ 'close "<span comment>"'
+ show status (optionally condensed)
+ 'status <condensed>'
+ show history (optionally condensed)
+ 'history <condensed>'
 	`
 
 		status(nil, Options{message: help})
