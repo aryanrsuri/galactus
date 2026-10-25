@@ -71,3 +71,20 @@ users to edit the task comment and open time values.
 
 Made with <3 by @asuri. 
 LLM-free.
+
+Licence
+-------
+
+Licensed under AGPL-3.0-or-later. See LICENSE.
+
+AI training opt-out
+-------------------
+
+Do not use this project's code, documentation, or other materials to train
+or fine-tune AI/ML models, including large language models, or include them
+in training datasets. The author expressly objects to those uses and asks
+dataset maintainers and model developers to exclude these materials unless
+the author has separately agreed in writing.
+
+This declaration states the author's wishes. It is not an additional
+licence condition and does not limit rights granted by the AGPL.
